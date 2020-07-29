@@ -1,20 +1,39 @@
 #!/usr/bin/env python3
 import random
 import sys
+import argparse
 
-import time
+from interceptor import error
 from time import sleep
-
-import tkinter as tk
 from tkinter import Tk
 from tkinter import Canvas
+from tkinter import Label
+
+def _args_get(args=sys.argv[1:]):
+    parser = argparse.ArgumentParser()
+
+    parser.error = error(parser)
+
+    parser.add_argument("elq", type=int, help="elements quantity")
+    parser.add_argument("dx", type=int, help="element's size by X")
+    parser.add_argument("dy", type=int, help="element's size by Y")
+    parser.add_argument("fsx", type=int, help="field size by X")
+    parser.add_argument("fsy", type=int, help="field size by Y")
+    parser.add_argument("fname", type=str, help="file with TP-ELC commands")
+    parser.add_argument("--log-show", action="store_true", help="show log")
+
+    parser.set_defaults(log_show=False)
+
+    args = parser.parse_args(args)
+
+    return parser, args
 
 def file_read(fname):
     cmds = list()
 
     with open(fname) as f:
         for line in f:
-            cmds += [line.split("\n")]
+            cmds += [line.split('\n')]
 
     return cmds
 
@@ -27,21 +46,19 @@ def schemes_place(canvas, n, dx, dy, ly):
         els += [0]
         lbls += [0]
 
-        capt = str(i + 1)
-
         els[i] = canvas.create_rectangle(dx * (n - i) - dx, ly - dy,
             dx * (n - i + 1) - dx, ly, outline="#000", fill="#1c1", width=2)
         lbls[i] = canvas.create_text(dx * (n - i + 0.5) - dx, ly - dy / 2,
-            font=("Terminus", 8), text=capt)
+            font=("Terminus", 8), text=str(i + 1))
 
     return els, lbls
 
 # manipulator init
 def man_init(canvas, r, dx, dy):
-    hand = canvas.create_line(0, 0, dx / 2, dy / 2, width=6, fill='black')
-    p = canvas.create_oval([0, 0],[r * 1.5, r * 1.5], fill='yellow')
+    hand = canvas.create_line(0, 0, dx / 2, dy / 2, width=6, fill="black")
+    p = canvas.create_oval([0, 0],[r * 1.5, r * 1.5], fill="yellow")
     v = canvas.create_oval([r / 2, r / 2], [r, r],
-        fill='blue')
+        fill="blue")
 
     return hand, p, v
 
@@ -61,16 +78,16 @@ def man_move(canvas, x, y, hand, p, v, vstate, els, eln, lbls):
 
 def grid_create(canvas, lx, ly, dx, dy, w):
     for i in range(0, lx, dx):
-        canvas.create_line([(i, 0), (i, ly)], fill='black', width=w,
-            tags='grid_line_w')
+        canvas.create_line([(i, 0), (i, ly)], fill="black", width=w,
+            tags="grid_line_w")
 
     for i in range(0, ly, dy):
-        canvas.create_line([(0, i), (lx, i)], fill='black', width=w,
-            tags='grid_line_h')
+        canvas.create_line([(0, i), (lx, i)], fill="black", width=w,
+            tags="grid_line_h")
 
     canvas.grid(row=0, column=0)
 
-def cmds_parse(canvas, cmds, num, p, v, vstate, els, eln, p_crds_arr):
+def cmds_parse(canvas, cmds, num, p, v, vstate, els, eln, p_crds_arr, log):
     cmd = cmds[num][0]
     pflag = False
     p_crds = list([0, 0])
@@ -78,22 +95,26 @@ def cmds_parse(canvas, cmds, num, p, v, vstate, els, eln, p_crds_arr):
     if cmd == "Clear Points":
         p_crds_arr = list()
 
-        print(cmd)
+        if log:
+            print(cmd)
     elif cmd[0:19] == "Add Point Cartesian":
         raw = cmd[19:len(cmd)]
         crds = raw.split(",")
         p_crds_arr += [(float(crds[0]), float(crds[1]))]
 
-        print(cmd[0:19], int(crds[0]), int(crds[1]))
+        if log:
+            print(cmd[0:19], int(crds[0]), int(crds[1]))
     elif cmd == "Z Axis Up":
         canvas.itemconfig(p, fill="yellow")
 
-        print(cmd)
+        if log:
+            print(cmd)
     elif cmd == "Z Axis Down":
         canvas.itemconfig(p, fill="red")
         canvas.update()
 
-        print(cmd)
+        if log:
+            print(cmd)
 
         sleep(0.25)
     elif cmd == "Vacuum On":
@@ -101,13 +122,15 @@ def cmds_parse(canvas, cmds, num, p, v, vstate, els, eln, p_crds_arr):
         vstate = 1
         els[0] = els[eln]
 
-        print(cmd)
+        if log:
+            print(cmd)
     elif cmd == "Vacuum Off":
         canvas.itemconfig(v, fill="blue")
         vstate = 0
         eln += 1
 
-        print(cmd)
+        if log:
+            print(cmd)
     elif cmd[0:13] == "Move To Point":
         pnum = int(cmd[14:len(cmd)]) - 1
         p_crds[0] = p_crds_arr[pnum][0]
@@ -115,7 +138,8 @@ def cmds_parse(canvas, cmds, num, p, v, vstate, els, eln, p_crds_arr):
 
         pflag = True
 
-        print(cmd[0:14], pnum + 1)
+        if log:
+            print(cmd[0:14], pnum + 1)
 
     return pflag, els, eln, p_crds, p_crds_arr, vstate
 
@@ -152,17 +176,14 @@ def el_move(w, canvas, hand, p, v, vstate, p_crds, p_crds_arr, els, eln,
         els, eln, lbls))
 
 def main():
-    if len(sys.argv) != 7:
-        print("usage: " + sys.argv[0] + " n dx dy fsx fsy fname")
-
-        sys.exit(-1)
-
-    n = int(sys.argv[1]) # schemes quantity
-    dx = int(sys.argv[2]) # block's size by X
-    dy = int(sys.argv[3]) # block's suze by Y
-    fsx = int(sys.argv[4]) # blocks quantity by X
-    fsy = int(sys.argv[5]) # blocks quantity by Y
-    fname = sys.argv[6]
+    parser, args = _args_get()
+    elq = args.elq
+    dx = args.dx
+    dy = args.dy
+    fsx = args.fsx
+    fsy = args.fsy + 1
+    fname = args.fname
+    log = args.log_show;
     lx = dx * fsx # field's size by X
     ly = dy * fsy # field's size by Y
     hand = None
@@ -175,33 +196,29 @@ def main():
     cmds = file_read(fname)
     cmdn = 0
     w = Tk()
-    l = tk.Label(text='0')
-    canvas = Canvas(w, background='white', width=lx, height=ly)
+    l = Label(text='0')
+    canvas = Canvas(w, background="white", width=lx, height=ly)
 
-    w.title("TP-ELC emulator's model")
+    w.title("TP-ELC emulator")
 
     grid_create(canvas, lx, ly, dx, dy, 2) # create grid
-    els, lbls = schemes_place(canvas, n, dx, dy, ly) # place schemes
+    els, lbls = schemes_place(canvas, elq, dx, dy, ly) # place schemes
     hand, p, v = man_init(canvas, pr, dx, dy) # manipulator init
     canvas.pack()
 
     canvas.update()
     sleep(2)
 
-    print("Start parsing" + "\n")
-
     # commands parse
     for i in range(len(cmds)):
         pflag, els, eln, p_crds, p_crds_arr, vstate = cmds_parse(canvas,
-            cmds, cmdn, p, v, vstate, els, eln, p_crds_arr)
+            cmds, cmdn, p, v, vstate, els, eln, p_crds_arr, log)
         cmdn += 1
 
         if pflag == True:
             el_move(w, canvas, hand, p, v, vstate, p_crds, p_crds_arr, els,
                 eln, lbls)
             pflag = False
-
-    print("\n" + "Parsing completed")
 
     sleep(5)
 

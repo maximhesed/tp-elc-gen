@@ -1,31 +1,25 @@
 #!/usr/bin/env python3
 import random
 import sys
-import time
 import argparse
 
-def _error(parser):
-    def wrapper(interceptor):
-        parser.print_help()
-
-        sys.exit(-1)
-
-    return wrapper
+from interceptor import error
+from time import time
 
 def _args_get(args=sys.argv[1:]):
     parser = argparse.ArgumentParser()
 
-    parser.error = _error(parser)
+    parser.error = error(parser)
 
-    parser.add_argument("elq", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("dx", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("dy", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("nx", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("ny", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("edq", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("edq_max", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("its", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("fname", type=str, help=argparse.SUPPRESS)
+    parser.add_argument("elq", type=int, help="elements quantity")
+    parser.add_argument("dx", type=int, help="element's size by X")
+    parser.add_argument("dy", type=int, help="element's size by Y")
+    parser.add_argument("nx", type=int, help="blocks quantity by X")
+    parser.add_argument("ny", type=int, help="blocks quantity by Y")
+    parser.add_argument("edq", type=int, help="edges quantity")
+    parser.add_argument("edq_max", type=int, help="max edge's weight")
+    parser.add_argument("its", type=int, help="iterations quantity")
+    parser.add_argument("fname", type=str, help="name of generation file")
     parser.add_argument("--with-swap", action="store_true",
         help="swap random elements positions")
     parser.add_argument("--with-sort", action="store_true",
@@ -97,7 +91,7 @@ def edgs_gen(elq, edq, edq_max):
 def els_place(elq, dx, dy, lx, ly):
     els = list()
 
-    [els.append((dx * (elq - i) - dx, ly - dy)) for i in range(elq)]
+    [els.append((dx * (elq - i) - dx, ly)) for i in range(elq)]
 
     return els
 
@@ -322,7 +316,7 @@ def main():
     if ll_show:
         print()
 
-    ts = time.time()
+    ts = time()
 
     for i in range(its):
         # mutate acc
@@ -362,7 +356,7 @@ def main():
         elif mode == "soft":
             elsp[rand(0, elq - 1)] = elp_rand(elsp, bq)
 
-    tf = time.time() - ts
+    tf = time() - ts
 
     print()
     print("--- generation completed ---")
